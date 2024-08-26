@@ -88,7 +88,7 @@ if (-not $siteUrl) {
 
 # Solicitar titulo del sitio
 if (-not $siteTitle) {
-	$default = "Mi Tienda Online"
+	$default = "Mi Web Wordpress"
 	if (!($siteTitle = Read-Host "Ingrese la URL del sitio [${default}]")) { $siteTitle = $default }
 }
 
@@ -136,7 +136,7 @@ $pluginsOptimizacion = @("litespeed-cache", "redirection")
 $pluginsFrontend = @("astra-sites", "insert-headers-and-footers")
 $pluginsEcommerce = @("woocommerce")
 
-$plugins = $pluginsSeguridad + $pluginsMantenimiento + $pluginsSEO + $pluginsExtension + $pluginsOptimizacion + $pluginsFrontend + $pluginsEcommerce
+$plugins = $pluginsSeguridad + $pluginsMantenimiento + $pluginsSEO + $pluginsExtension + $pluginsOptimizacion + $pluginsFrontend
 
 # Contar el número total de plugins
 $totalPlugins = $plugins.Count
@@ -161,8 +161,27 @@ foreach ($plugin in $plugins) {
     $pluginCounter++
 }
 
+# Preguntar al usuario si desea instalar los plugins de eCommerce
+$installEcommerce = Read-Host "¿Desea instalar los plugins de eCommerce? (S/N)"
 
-# Instalar y activar tema
-wp theme install storefront --activate
+if ($installEcommerce -match '^(S|Sí|Si|s|si|sí|y|yes|Y|Yes)$') {
+    # Contar el número de plugins de eCommerce
+    $totalEcommercePlugins = $pluginsEcommerce.Count
+    $ecommerceCounter = 1
+
+    foreach ($plugin in $pluginsEcommerce) {
+        # Mostrar progreso de la instalación de plugins de eCommerce
+        Write-Host "Instalando plugin de eCommerce $ecommerceCounter de $totalEcommercePlugins" -ForegroundColor Yellow
+
+        # Instalar y activar el plugin
+        wp plugin install $plugin --activate
+
+        # Incrementar contador
+        $ecommerceCounter++
+    }
+
+    # Instalar y activar tema
+    wp theme install storefront --activate
+}
 
 Write-Output "La instalacion de $siteTitle se ha completado en $siteUrl"
