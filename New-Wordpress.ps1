@@ -54,8 +54,8 @@ $projectPath = Join-Path -Path (Get-Location) -ChildPath $projectName
 
 # Solicitar usuario de la base de datos
 if (-not $dbUser) {
-	$default = "root"
-	if (!($dbUser = Read-Host "Ingrese el usuario de la base de datos [${default}]")) { $dbUser = $default }
+    $default = "root"
+    if (!($dbUser = Read-Host "Ingrese el usuario de la base de datos [${default}]")) { $dbUser = $default }
 }
 
 # Solicitar password de la base de datos
@@ -66,36 +66,36 @@ if (-not $dbPassword) {
 # Solicitar nombre de la base de datos hasta que sea valido
 do {	
     if (-not $dbName) {        
-		$default = "wpdb_${projectName}"
-		if (!($dbName = Read-Host "Ingrese el nombre de la base de datos [${default}]")) { $dbName = $default }
+        $default = "wpdb_${projectName}"
+        if (!($dbName = Read-Host "Ingrese el nombre de la base de datos [${default}]")) { $dbName = $default }
     } 
 	
-	$dbPasswordPlain = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($dbPassword))
-	$dbExists = Test-DatabaseExists -name $dbName -user $dbUser -password $dbPasswordPlain
-	if ($dbExists) {
-		Write-Host "La base de datos '$dbName' ya existe. Por favor, ingrese otro nombre de base de datos." -ForegroundColor Red
-		$dbName = $null
-	}
+    $dbPasswordPlain = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($dbPassword))
+    $dbExists = Test-DatabaseExists -name $dbName -user $dbUser -password $dbPasswordPlain
+    if ($dbExists) {
+        Write-Host "La base de datos '$dbName' ya existe. Por favor, ingrese otro nombre de base de datos." -ForegroundColor Red
+        $dbName = $null
+    }
     
 } while (-not $dbName)
 
 
 # Solicitar url del sitio
 if (-not $siteUrl) {
-	$default = "http://localhost/${projectName}"
-	if (!($siteUrl = Read-Host "Ingrese la URL del sitio [${default}]")) { $siteUrl = $default }
+    $default = "http://localhost/${projectName}"
+    if (!($siteUrl = Read-Host "Ingrese la URL del sitio [${default}]")) { $siteUrl = $default }
 }
 
 # Solicitar titulo del sitio
 if (-not $siteTitle) {
-	$default = "Mi Web Wordpress"
-	if (!($siteTitle = Read-Host "Ingrese la URL del sitio [${default}]")) { $siteTitle = $default }
+    $default = "Mi Web Wordpress"
+    if (!($siteTitle = Read-Host "Ingrese la URL del sitio [${default}]")) { $siteTitle = $default }
 }
 
 # Solicitar el usuario administrador
 if (-not $adminUser) {
-	$default = "admin"
-	if (!($adminUser = Read-Host "Ingrese el nombre de usuario administrador [${default}]")) { $adminUser = $default }
+    $default = "admin"
+    if (!($adminUser = Read-Host "Ingrese el nombre de usuario administrador [${default}]")) { $adminUser = $default }
 }
 
 if (-not $adminPassword) {
@@ -106,8 +106,8 @@ $adminPasswordPlain = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtim
 
 # Solicitar email del usuario administrador
 if (-not $adminEmail) {
-	$default = "admin@example.com"
-	if (!($adminEmail = Read-Host "Ingrese el email de usuario administrador [${default}]")) { $adminEmail = $default }
+    $default = "admin@example.com"
+    if (!($adminEmail = Read-Host "Ingrese el email de usuario administrador [${default}]")) { $adminEmail = $default }
 }
 
 
@@ -127,6 +127,9 @@ wp db create
 # Instalar WordPress
 wp core install --url=$siteUrl --title=$siteTitle --admin_user=$adminUser --admin_password=$adminPasswordPlain --admin_email=$adminEmail
 
+
+Write-Host "Instalación de plugins" -ForegroundColor Green
+
 # Instalar y activar plugins
 $pluginsSeguridad = @("wordfence", "wps-hide-login")
 $pluginsMantenimiento = @("all-in-one-wp-migration")
@@ -134,7 +137,10 @@ $pluginsSEO = @("seo-by-rank-math", "wordpress-seo", "google-site-kit")
 $pluginsExtension = @("advanced-custom-fields", "svg-support", "contact-form-7")
 $pluginsOptimizacion = @("litespeed-cache", "redirection")
 $pluginsFrontend = @("astra-sites", "insert-headers-and-footers")
-$pluginsEcommerce = @("woocommerce")
+
+$pluginsWoocommerce = @("woocommerce")
+$pluginsIdiomas = @("polylang");
+$pluginsWoocommerceIdiomas = @("woo-poly-integration");
 
 $plugins = $pluginsSeguridad + $pluginsMantenimiento + $pluginsSEO + $pluginsExtension + $pluginsOptimizacion + $pluginsFrontend
 
@@ -144,21 +150,45 @@ $totalPlugins = $plugins.Count
 # Inicializar contador
 $pluginCounter = 1
 
+# Preguntar al usuario si quiere activar los plugins automáticamente
+$activarPlugins = Read-Host "¿Desea Plugins automaticamente plugins que se instalen? (S/N)"
+if ($activarPlugins -match '^(S|Sí|Si|s|si|sí|y|yes|Y|Yes)$') {
+    $activar = "--activate"
+}
+else {    
+    $activar = ""
+}
+
 foreach ($plugin in $plugins) {
-	# Mostrar progreso
+    # Mostrar progreso
     Write-Host "Instalando plugin $pluginCounter de $totalPlugins" -ForegroundColor Yellow
 	
-	if ($plugin -eq "wps-hide-login"){
-		$activar = ""
-	}
-	else{
-		$activar = "--activate"
-	}
-	
-    wp plugin install $plugin $activar
-	
-	# Incrementar contador
+    if ($plugin -eq "wps-hide-login") {
+        wp plugin install $plugin
+    }
+    else {
+        wp plugin install $plugin $activar
+    }
+    # Incrementar contador
     $pluginCounter++
+}
+
+# Preguntar al usuario si desea un sitio multilenguaje
+$installMultiLang = Read-Host "¿El sitio es multilenguaje? (S/N)"
+if ($installMultiLang -match '^(S|Sí|Si|s|si|sí|y|yes|Y|Yes)$') {
+    # Contar el número de plugins de Idioma
+    $totalIdiomasPlugins = $pluginsIdiomas.Count
+    $idiomaCounter = 1
+
+    foreach ($plugin in $pluginsIdiomas) {
+        # Mostrar progreso de la instalación de plugins de eCommerce
+        Write-Host "Instalando plugin de eCommerce $idiomaCounter de $totalIdiomasPlugins" -ForegroundColor Yellow
+
+        wp plugin install $plugin $activar
+
+        # Incrementar contador
+        $idiomaCounter++
+    }
 }
 
 # Preguntar al usuario si desea instalar los plugins de eCommerce
@@ -166,22 +196,26 @@ $installEcommerce = Read-Host "¿Desea instalar los plugins de eCommerce? (S/N)"
 
 if ($installEcommerce -match '^(S|Sí|Si|s|si|sí|y|yes|Y|Yes)$') {
     # Contar el número de plugins de eCommerce
-    $totalEcommercePlugins = $pluginsEcommerce.Count
+    $totalEcommercePlugins = $pluginsWoocommerce.Count
     $ecommerceCounter = 1
 
-    foreach ($plugin in $pluginsEcommerce) {
+    if ($installMultiLang) {
+        $pluginsWoocommerce = $pluginsWoocommerce + $pluginsWoocommerceIdiomas;
+    }
+
+    foreach ($plugin in $pluginsWoocommerce) {
         # Mostrar progreso de la instalación de plugins de eCommerce
         Write-Host "Instalando plugin de eCommerce $ecommerceCounter de $totalEcommercePlugins" -ForegroundColor Yellow
 
         # Instalar y activar el plugin
-        wp plugin install $plugin --activate
+        wp plugin install $plugin $activar
 
         # Incrementar contador
         $ecommerceCounter++
     }
 
     # Instalar y activar tema
-    wp theme install storefront --activate
+    wp theme install storefront $activar
 }
 
 Write-Output "La instalacion de $siteTitle se ha completado en $siteUrl"
