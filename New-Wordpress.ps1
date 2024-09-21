@@ -134,7 +134,13 @@ Write-Host "Instalación de plugins" -ForegroundColor Green
 $pluginsSeguridad = @("wordfence", "wps-hide-login")
 $pluginsMantenimiento = @("all-in-one-wp-migration")
 $pluginsSEO = @("seo-by-rank-math", "wordpress-seo", "google-site-kit")
-$pluginsExtension = @("advanced-custom-fields", "svg-support", "contact-form-7")
+$pluginsExtension = @(
+    "advanced-custom-fields", 
+    "svg-support", 
+    "contact-form-7", 
+    "media-library-plus/media-library-plus", 
+    "media-library-plus/mlp-reset"
+)
 $pluginsOptimizacion = @("litespeed-cache", "redirection")
 $pluginsFrontend = @("astra-sites", "insert-headers-and-footers")
 
