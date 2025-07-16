@@ -40,5 +40,10 @@ if (-not $selectedFiles) {
     exit 0
 }
 
-# 6. Mostrar contenido de los archivos seleccionados
+# 6. Asegurar que la salida sea un array
+if (-not ($selectedFiles -is [System.Array])) {
+    $selectedFiles = @($selectedFiles)
+}
+
+# 7. Mostrar contenido de los archivos seleccionados
 & $getFileContentsScript @selectedFiles
