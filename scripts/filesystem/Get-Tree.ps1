@@ -140,7 +140,7 @@ function Show-Tree {
     # Mostrar nombre de la carpeta raíz
     if ($IsRoot) {
         Write-Output "$($FolderName)/"
-        # $newPrefix = "│   "
+        $newPrefix = "│   "
     }
     else {
         $newPrefix = $Prefix
