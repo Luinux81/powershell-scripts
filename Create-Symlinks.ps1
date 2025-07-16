@@ -11,7 +11,8 @@ $scriptsPath = Join-Path -Path $PSScriptRoot -ChildPath "scripts"
 $scripts = Get-ChildItem -Path $scriptsPath -Recurse -Filter *.ps1
 
 foreach ($script in $scripts) {
-    $linkName = $script.BaseName  # Nombre sin extensión
+    # Aseguramos que el enlace tenga extensión .ps1
+    $linkName = "$($script.BaseName).ps1"
     $linkPath = Join-Path -Path $binPath -ChildPath $linkName
 
     # Si el enlace ya existe, lo eliminamos para actualizarlo
@@ -19,7 +20,7 @@ foreach ($script in $scripts) {
         Remove-Item -Path $linkPath -Force
     }
 
-    # Crear enlace simbólico (requiere permisos de administrador o política adecuada)
+    # Crear el enlace simbólico (requiere permisos adecuados)
     New-Item -Path $linkPath -ItemType SymbolicLink -Value $script.FullName | Out-Null
-    Write-Host "Enlace creado: $linkName -> $($script.FullName)"
+    Write-Host "✅ Enlace creado: $linkName → $($script.FullName)"
 }

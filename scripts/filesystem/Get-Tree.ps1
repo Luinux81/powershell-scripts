@@ -1,4 +1,4 @@
-# require -Version 7.0
+# requires -Version 7.0
 
 # 🔒 Verificación de versión mínima
 # if ($PSVersionTable.PSVersion.Major -lt 7) {
@@ -7,14 +7,14 @@
 #     exit 1
 # }
 
-
-
 # 🧩 Parámetros de entrada
 param(
     [Parameter(Position = 0)]
     [string]$Path,
 
     [string[]]$Exclude,
+
+    [string[]]$ExcludeWellKnown,
 
     [switch]$Files,
 
@@ -28,6 +28,26 @@ param(
 if (-not $Path) { $Path = "." }
 if (-not $Exclude) { $Exclude = @() }
 
+# 📦 Excepciones conocidas por tecnología
+$WellKnownExclusions = @{
+    "laravel" = @(".vscode", ".git", "vendor", "node_modules")
+    "nodejs"  = @("node_modules", "dist", "build", ".git", ".vscode")
+    "react"   = @("node_modules", "dist", "build", ".git", ".vscode", ".next")
+}
+
+# 🎯 Aplicar exclusiones conocidas si se solicitó
+if ($ExcludeWellKnown) {
+    foreach ($entry in $ExcludeWellKnown) {
+        $key = $entry.ToLowerInvariant()
+        if ($WellKnownExclusions.ContainsKey($key)) {
+            $Exclude += $WellKnownExclusions[$key]
+        }
+        else {
+            Write-Warning "⚠️ '$entry' no es una opción reconocida en -ExcludeWellKnown. Opciones válidas: $($WellKnownExclusions.Keys -join ', ')"
+        }
+    }
+}
+
 # 📖 Mostrar ayuda si se solicita
 if ($Help.IsPresent) {
     Write-Host @"
@@ -40,40 +60,31 @@ DESCRIPCIÓN:
     excluir carpetas específicas y mostrar contenidos de archivos.
 
 SINTAXIS:
-    Get-Tree [-Path <ruta>] [-Exclude <array>] [-Files] [-SelectContents] [-Help|-h]
+    Get-Tree [-Path <ruta>] [-Exclude <array>] [-ExcludeWellKnown <array>]
+             [-Files] [-SelectContents] [-Help|-h]
 
 PARÁMETROS:
-    -Path <string>          Ruta del directorio a analizar (por defecto: directorio actual)
-    -Exclude <string[]>     Array de directorios/archivos a excluir
-    -Files                  Incluir archivos en el árbol (por defecto: solo directorios)
-    -SelectContents         Mostrar ventana para seleccionar archivos y ver su contenido
-    -Help, -h               Mostrar esta ayuda
+    -Path <string>              Ruta del directorio a analizar (por defecto: directorio actual)
+    -Exclude <string[]>         Array de directorios/archivos a excluir
+    -ExcludeWellKnown <string[]> Excluir conjuntos conocidos (por ahora: laravel, nodejs, react)
+    -Files                      Incluir archivos en el árbol (por defecto: solo directorios)
+    -SelectContents             Mostrar ventana para seleccionar archivos y ver su contenido
+    -Help, -h                   Mostrar esta ayuda
 
 EJEMPLOS DE USO:
     
-    # Árbol básico del directorio actual
     Get-Tree
-    
-    # Árbol de una ruta específica
     Get-Tree -Path "C:\MiProyecto"
-    
-    # Excluir directorios específicos (rutas relativas)
     Get-Tree -Path "C:\MiProyecto" -Exclude @("bin", "obj", "node_modules")
-    
-    # Excluir con rutas absolutas
     Get-Tree -Path "." -Exclude @("C:\temp\logs", "build")
-    
-    # Mostrar archivos también en el árbol
     Get-Tree -Files -Exclude @(".git", "dist")
-    
-    # Incluir selección interactiva de contenidos
     Get-Tree -SelectContents -Exclude @("vendor", "cache")
-    
-    # Ejemplo completo con todos los parámetros
     Get-Tree -Path "C:\Proyecto" -Exclude @("bin", "obj", ".git") -Files -SelectContents
-    
-    # Excluir múltiples tipos de directorios comunes
     Get-Tree -Exclude @("node_modules", "vendor", "bin", "obj", ".git", "dist", "build")
+
+    # Excluir carpetas comunes automáticamente
+    Get-Tree -ExcludeWellKnown laravel
+    Get-Tree -ExcludeWellKnown react,nodejs -Exclude @("coverage")
 
 NOTAS:
     - Las exclusiones pueden ser rutas relativas o absolutas
@@ -102,22 +113,19 @@ function Get-ExcludedStatus {
     $normalizedPath = [IO.Path]::GetFullPath($ItemFullPath).ToUpperInvariant()
 
     foreach ($ex in $Exclude) {
-        $exNormalized = $ex.ToUpperInvariant()
+        # $exNormalized = $ex.ToUpperInvariant()
 
         if ($ex.Contains("*") -or $ex.Contains("?")) {
-            # Si es un patrón, evaluar con -like
             if ($itemName -like $ex -or $normalizedPath -like $ex) {
                 return $true
             }
         }
         elseif (-not [IO.Path]::IsPathRooted($ex)) {
-            # Comparar nombre simple
             if ($itemName -eq $ex) {
                 return $true
             }
         }
         else {
-            # Comparar ruta absoluta
             $normalizedEx = [IO.Path]::GetFullPath($ex).ToUpperInvariant()
             if ($normalizedPath -eq $normalizedEx -or 
                 $normalizedPath.StartsWith($normalizedEx + [IO.Path]::DirectorySeparatorChar)) {
@@ -173,7 +181,6 @@ function Show-Tree {
         }
     }
 }
-
 
 # --- Ejecución principal ---
 Write-Host "`n📁 Estructura de '$($BasePath.Path)'`n"
