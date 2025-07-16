@@ -1,0 +1,4 @@
+**
+
+# Incluir el propio .gitignore
+!.gitignore
