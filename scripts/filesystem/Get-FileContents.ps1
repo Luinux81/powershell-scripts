@@ -32,18 +32,13 @@ function Show-FileContents {
 
     foreach ($path in $FilePaths) {
         try {
-            # Resolve-Path maneja rutas absolutas, relativas y wildcards y devuelve rutas reales
             $resolvedPaths = Resolve-Path -Path $path -ErrorAction Stop
-
             foreach ($resolvedPathInfo in $resolvedPaths) {
                 $filePath = $resolvedPathInfo.ProviderPath
-
-                # Asegurar que es archivo, no directorio
                 if (-not (Test-Path -Path $filePath -PathType Leaf)) {
                     continue
                 }
 
-                # Obtener ruta relativa si está dentro de currentDir, sino ruta absoluta
                 if ($filePath.StartsWith($currentDir)) {
                     $relativePath = $filePath.Substring($currentDir.Length + 1)
                 }
@@ -53,13 +48,8 @@ function Show-FileContents {
 
                 $content = Get-Content -Path $filePath -Raw -ErrorAction Stop
 
-                Write-Host "`n=== $relativePath ===" -ForegroundColor Cyan
-                Write-Host $content
-
-                $output += [PSCustomObject]@{
-                    RelativePath = $relativePath
-                    Content      = $content
-                }
+                # En lugar de Write-Host, guardamos en variable
+                $output += "`n`n=== $relativePath ===`n`n$content"
             }
         }
         catch {
@@ -67,7 +57,10 @@ function Show-FileContents {
         }
     }
 
-    return $output
+    # Devolvemos todo el contenido concatenado
+    return $output -join "`n"
 }
 
-$null = Show-FileContents -FilePaths $Paths
+
+$output = Show-FileContents -FilePaths $Paths
+Write-Output $output
