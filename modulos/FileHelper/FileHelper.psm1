@@ -1,27 +1,27 @@
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
-Function Set-FileContentReplacement{
+Function Set-FileContentReplacement {
     Param(
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
         [string]$RutaArchivo,
 
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
         [string]$Original,
 
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory = $true)]
         [string]$Reemplazo
     )
 
     $RutaArchivoMod = $RutaArchivo + ".tmp" 
 
     Get-Content $RutaArchivo -ReadCount 10000 |
-        ForEach-Object {
-            $linea = $_.Replace($original,$Reemplazo)
-            Add-Content -Path $RutaArchivoMod -Value $linea
-        }
+    ForEach-Object {
+        $linea = $_.Replace($original, $Reemplazo)
+        Add-Content -Path $RutaArchivoMod -Value $linea
+    }
 
     Remove-Item -Path $RutaArchivo
 
@@ -79,8 +79,8 @@ function Get-FileFromWeb {
                 # build progressbar with string function
                 $curBarSize = $BarSize * $percent
                 $progbar = ""
-                $progbar = $progbar.PadRight($curBarSize,[char]9608)
-                $progbar = $progbar.PadRight($BarSize,[char]9617)
+                $progbar = $progbar.PadRight($curBarSize, [char]9608)
+                $progbar = $progbar.PadRight($BarSize, [char]9617)
         
                 if (!$Complete.IsPresent) {
                     Write-Host -NoNewLine "`r$ProgressText $progbar [ $($CurrentValue.ToString("#.###").PadLeft($TotalValue.ToString("#.###").Length))$ValueSuffix / $($TotalValue.ToString("#.###"))$ValueSuffix ] $($percentComplete.ToString("##0.00").PadLeft(6)) % complete"
@@ -104,11 +104,11 @@ function Get-FileFromWeb {
                 throw "Remote file either doesn't exist, is unauthorized, or is forbidden for '$URL'."
             }
   
-            if($File -match '^\.\\') {
+            if ($File -match '^\.\\') {
                 $File = Join-Path (Get-Location -PSProvider "FileSystem") ($File -Split '^\.')[1]
             }
             
-            if($File -and !(Split-Path $File)) {
+            if ($File -and !(Split-Path $File)) {
                 $File = Join-Path (Get-Location -PSProvider "FileSystem") $File
             }
 
@@ -204,22 +204,22 @@ function Expand-Zip {
     #>
     [CmdletBinding()]
     param(
-        [parameter(Mandatory=$true, Position=0)]
+        [parameter(Mandatory = $true, Position = 0)]
         [ValidateNotNullOrEmpty()]
-        [ValidateScript({Test-Zip $_ })]
+        [ValidateScript({ Test-Zip $_ })]
         [string]$Path,
-        [parameter(Mandatory=$true, Position=1)]
+        [parameter(Mandatory = $true, Position = 1)]
         [ValidateNotNullOrEmpty()]
         [string]$Destination,
-        [ValidateScript({!$_ -or (Test-Path $_ -PathType Container -IsValid)})]
+        [ValidateScript({ !$_ -or (Test-Path $_ -PathType Container -IsValid) })]
         [string]$ZipDirectory,
-        [ValidateScript({!$_ -or (Test-Path $_ -PathType Leaf -IsValid)})]
+        [ValidateScript({ !$_ -or (Test-Path $_ -PathType Leaf -IsValid) })]
         [string]$ZipFileName
     )
 
     $prefix = ''
-    if($ZipDirectory){
-        $prefix = ($ZipDirectory).Replace('\','/').Trim('/') + '/'
+    if ($ZipDirectory) {
+        $prefix = ($ZipDirectory).Replace('\', '/').Trim('/') + '/'
     }
     if (!(test-path $Destination -PathType Container)) {
         New-item $Destination -Type Directory | out-null
@@ -232,23 +232,23 @@ function Expand-Zip {
     $zipPackage = [IO.Compression.ZipFile]::OpenRead($zipAbsolutePath)
     try {
         $entries = $zipPackage.Entries
-        if ($ZipFileName){
+        if ($ZipFileName) {
             $entries = $entries |
-                ? {$_.FullName.Replace('\','/') -eq "${prefix}${ZipFileName}"} |
-                select -First 1
+            ? { $_.FullName.Replace('\', '/') -eq "${prefix}${ZipFileName}" } |
+            select -First 1
         }
         else {
             #Filter out directories
-            $entries = $zipPackage.Entries |? Name
+            $entries = $zipPackage.Entries | ? Name
             if ($ZipDirectory) {
                 #Filter out items not under requested directory
-                $entries = $entries |? { $_.FullName.Replace('\','/').StartsWith($prefix, "OrdinalIgnoreCase")}
+                $entries = $entries | ? { $_.FullName.Replace('\', '/').StartsWith($prefix, "OrdinalIgnoreCase") }
             }
         }
 
-        $totalFileSize = ($entries |ForEach-Object length | Measure-Object -sum).Sum
+        $totalFileSize = ($entries | ForEach-Object length | Measure-Object -sum).Sum
         $processedFileSize = 0
-        $entries |ForEach-Object {
+        $entries | ForEach-Object {
             $destination = join-path $absoluteDestination $_.FullName.Substring($prefix.Length)
             
             Write-Progress 'Extracting Zip' `
@@ -288,15 +288,87 @@ function Test-Zip {
     #>
     [CmdletBinding()]
     param(
-        [parameter(Mandatory=$true, Position=0, ValueFromPipeline=$true)]
+        [parameter(Mandatory = $true, Position = 0, ValueFromPipeline = $true)]
         [ValidateNotNullOrEmpty()]
         [string]$Path
     )
 
     Test-Path $Path -PathType Leaf
-    if((Get-Item $Path).Extension -ne '.zip') {
+    if ((Get-Item $Path).Extension -ne '.zip') {
         throw "$Path is not a zip file"
     }
 }
+
+
+function Select-FileInteractive {
+    [CmdletBinding()]
+    param(
+        [string]$StartPath = (Get-Location).Path
+    )
+
+    # Obtenemos archivos y directorios en StartPath
+    $items = Get-ChildItem -Path $StartPath | Sort-Object -Property PSIsContainer, Name
+
+    # Creamos menú simple: [D] para directorio, [F] para archivo
+    $menuItems = foreach ($item in $items) {
+        if ($item.PSIsContainer) {
+            "[D] $($item.Name)"
+        }
+        else {
+            "[F] $($item.Name)"
+        }
+    }
+
+    $menuItems += '[..] Subir un nivel'
+    $menuItems += '[X] Cancelar'
+
+    while ($true) {
+        Write-Host "Carpeta actual: $StartPath" -ForegroundColor Yellow
+        for ($i = 0; $i -lt $menuItems.Count; $i++) {
+            Write-Host "$i`t$($menuItems[$i])"
+        }
+
+        $selection = Read-Host "Selecciona un índice"
+
+        if ($selection -eq 'X' -or $selection -eq 'x') {
+            return $null
+        }
+
+        if ([int]::TryParse($selection, [ref]$null) -and
+            $selection -ge 0 -and
+            $selection -lt $menuItems.Count) {
+
+            $selectedItem = $items[$selection]
+
+            if ($selection -eq ($menuItems.Count - 2)) {
+                # Subir un nivel
+                $parent = Split-Path $StartPath -Parent
+                if ([string]::IsNullOrEmpty($parent)) {
+                    Write-Host "Ya estás en la raíz, no puedes subir más." -ForegroundColor Red
+                }
+                else {
+                    # Actualizamos la carpeta y recargamos menú
+                    return Select-FileInteractive -StartPath $parent
+                }
+            }
+            elseif ($selection -eq ($menuItems.Count - 1)) {
+                # Cancelar
+                return $null
+            }
+            elseif ($selectedItem.PSIsContainer) {
+                # Si es directorio, entra recursivamente
+                return Select-FileInteractive -StartPath $selectedItem.FullName
+            }
+            else {
+                # Si es archivo, retornamos ruta completa
+                return $selectedItem.FullName
+            }
+        }
+        else {
+            Write-Host "Selección inválida, intenta de nuevo." -ForegroundColor Red
+        }
+    }
+}
+
 
 Export-ModuleMember -Function *
