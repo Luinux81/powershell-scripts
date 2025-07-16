@@ -306,69 +306,72 @@ function Select-FileInteractive {
         [string]$StartPath = (Get-Location).Path
     )
 
-    # Obtenemos archivos y directorios en StartPath
-    $items = Get-ChildItem -Path $StartPath | Sort-Object -Property PSIsContainer, Name
-
-    # Creamos menú simple: [D] para directorio, [F] para archivo
-    $menuItems = foreach ($item in $items) {
-        if ($item.PSIsContainer) {
-            "[D] $($item.Name)"
-        }
-        else {
-            "[F] $($item.Name)"
-        }
-    }
-
-    $menuItems += '[..] Subir un nivel'
-    $menuItems += '[X] Cancelar'
-
     while ($true) {
-        Write-Host "Carpeta actual: $StartPath" -ForegroundColor Yellow
-        for ($i = 0; $i -lt $menuItems.Count; $i++) {
-            Write-Host "$i`t$($menuItems[$i])"
-        }
-
-        $selection = Read-Host "Selecciona un índice"
-
-        if ($selection -eq 'X' -or $selection -eq 'x') {
+        if (-not (Test-Path $StartPath)) {
+            Write-Host "Ruta no válida: $StartPath" -ForegroundColor Red
             return $null
         }
 
-        if ([int]::TryParse($selection, [ref]$null) -and
-            $selection -ge 0 -and
-            $selection -lt $menuItems.Count) {
+        Clear-Host
+        Write-Host "📁 Carpeta actual: $StartPath" -ForegroundColor Yellow
 
-            $selectedItem = $items[$selection]
+        # Obtener ítems reales (archivos y carpetas)
+        $items = Get-ChildItem -Path $StartPath -Force | Sort-Object -Property PSIsContainer, Name
 
-            if ($selection -eq ($menuItems.Count - 2)) {
-                # Subir un nivel
-                $parent = Split-Path $StartPath -Parent
-                if ([string]::IsNullOrEmpty($parent)) {
-                    Write-Host "Ya estás en la raíz, no puedes subir más." -ForegroundColor Red
-                }
-                else {
-                    # Actualizamos la carpeta y recargamos menú
-                    return Select-FileInteractive -StartPath $parent
-                }
-            }
-            elseif ($selection -eq ($menuItems.Count - 1)) {
-                # Cancelar
+        # Mostrar menú principal con índice
+        for ($i = 0; $i -lt $items.Count; $i++) {
+            $prefix = if ($items[$i].PSIsContainer) { "[D]" } else { "[F]" }
+            Write-Host "$i`t$prefix $($items[$i].Name)"
+        }
+
+        # Opciones adicionales
+        $indexUp = $items.Count
+        $indexCancel = $items.Count + 1
+        Write-Host "$indexUp`t[..] Subir un nivel"
+        Write-Host "$indexCancel`t[X] Cancelar"
+
+        $selection = Read-Host "Selecciona un índice"
+
+        switch ($selection) {
+            { $_ -eq $indexCancel.ToString() } {
                 return $null
             }
-            elseif ($selectedItem.PSIsContainer) {
-                # Si es directorio, entra recursivamente
-                return Select-FileInteractive -StartPath $selectedItem.FullName
+
+            { $_ -eq $indexUp.ToString() } {
+                $parent = Split-Path $StartPath -Parent
+                if ([string]::IsNullOrEmpty($parent)) {
+                    Write-Host "Ya estás en la raíz del sistema de archivos." -ForegroundColor Red
+                    Start-Sleep -Seconds 1.5
+                }
+                else {
+                    $StartPath = $parent
+                }
+                continue
             }
-            else {
-                # Si es archivo, retornamos ruta completa
-                return $selectedItem.FullName
+
+            default {
+                if ([int]::TryParse($selection, [ref]$null) -and
+                    $selection -ge 0 -and
+                    $selection -lt $items.Count) {
+
+                    $selectedItem = $items[$selection]
+                    if ($selectedItem.PSIsContainer) {
+                        $StartPath = $selectedItem.FullName
+                    }
+                    else {
+                        return $selectedItem.FullName
+                    }
+                }
+                else {
+                    Write-Host "❌ Selección inválida, intenta de nuevo." -ForegroundColor Red
+                    Start-Sleep -Seconds 1
+                }
             }
-        }
-        else {
-            Write-Host "Selección inválida, intenta de nuevo." -ForegroundColor Red
         }
     }
 }
+
+
 
 
 Export-ModuleMember -Function *
