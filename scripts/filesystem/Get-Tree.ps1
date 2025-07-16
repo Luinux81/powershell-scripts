@@ -1,11 +1,4 @@
-# requires -Version 7.0
-
-# 🔒 Verificación de versión mínima
-# if ($PSVersionTable.PSVersion.Major -lt 7) {
-#     Write-Host "`n🚫 Este script requiere PowerShell 7.0 o superior." -ForegroundColor Red
-#     Write-Host "   Versión detectada: $($PSVersionTable.PSVersion)`n"
-#     exit 1
-# }
+# require -Version 7.0
 
 # 🧩 Parámetros de entrada
 param(
@@ -24,34 +17,29 @@ param(
     [switch]$Help
 )
 
-# ✅ Valores por defecto
+# Valores por defecto
 if (-not $Path) { $Path = "." }
 if (-not $Exclude) { $Exclude = @() }
+if (-not $ExcludeWellKnown) { $ExcludeWellKnown = @() }
 
-# 📦 Excepciones conocidas por tecnología
-$WellKnownExclusions = @{
-    "laravel" = @(".vscode", ".git", "vendor", "node_modules")
-    "nodejs"  = @("node_modules", "dist", "build", ".git", ".vscode")
-    "react"   = @("node_modules", "dist", "build", ".git", ".vscode", ".next")
+# Mapas para exclusiones bien conocidas
+$wellKnownExclusionsMap = @{
+    "laravel" = @(".vscode", ".git", "vendor", "node_modules", "storage")
+    # Puedes agregar más en el futuro como:
+    # "react" = @("node_modules", "build", "dist"),
+    # "nodejs" = @("node_modules", "logs")
 }
 
-# 🎯 Aplicar exclusiones conocidas si se solicitó
-if ($ExcludeWellKnown) {
-    foreach ($entry in $ExcludeWellKnown) {
-        $key = $entry.ToLowerInvariant()
-        if ($WellKnownExclusions.ContainsKey($key)) {
-            $Exclude += $WellKnownExclusions[$key]
-        }
-        else {
-            Write-Warning "⚠️ '$entry' no es una opción reconocida en -ExcludeWellKnown. Opciones válidas: $($WellKnownExclusions.Keys -join ', ')"
-        }
+# Agregar exclusiones de wellKnown a $Exclude
+foreach ($wk in $ExcludeWellKnown) {
+    if ($wellKnownExclusionsMap.ContainsKey($wk.ToLower())) {
+        $Exclude += $wellKnownExclusionsMap[$wk.ToLower()]
     }
 }
 
-# 📖 Mostrar ayuda si se solicita
+# Mostrar ayuda si se solicita
 if ($Help.IsPresent) {
     Write-Host @"
-
 🌳 SCRIPT DE ÁRBOL DE DIRECTORIOS CON EXCLUSIONES
 ================================================
 
@@ -60,31 +48,23 @@ DESCRIPCIÓN:
     excluir carpetas específicas y mostrar contenidos de archivos.
 
 SINTAXIS:
-    Get-Tree [-Path <ruta>] [-Exclude <array>] [-ExcludeWellKnown <array>]
-             [-Files] [-SelectContents] [-Help|-h]
+    Get-Tree [-Path <ruta>] [-Exclude <array>] [-ExcludeWellKnown <array>] [-Files] [-SelectContents] [-Help|-h]
 
 PARÁMETROS:
-    -Path <string>              Ruta del directorio a analizar (por defecto: directorio actual)
-    -Exclude <string[]>         Array de directorios/archivos a excluir
-    -ExcludeWellKnown <string[]> Excluir conjuntos conocidos (por ahora: laravel, nodejs, react)
-    -Files                      Incluir archivos en el árbol (por defecto: solo directorios)
-    -SelectContents             Mostrar ventana para seleccionar archivos y ver su contenido
-    -Help, -h                   Mostrar esta ayuda
+    -Path <string>          Ruta del directorio a analizar (por defecto: directorio actual)
+    -Exclude <string[]>     Array de directorios/archivos a excluir
+    -ExcludeWellKnown <string[]> Opciones predefinidas de exclusión (ej: laravel)
+    -Files                  Incluir archivos en el árbol (por defecto: solo directorios)
+    -SelectContents         Mostrar ventana para seleccionar archivos y ver su contenido
+    -Help, -h               Mostrar esta ayuda
 
 EJEMPLOS DE USO:
-    
-    Get-Tree
-    Get-Tree -Path "C:\MiProyecto"
-    Get-Tree -Path "C:\MiProyecto" -Exclude @("bin", "obj", "node_modules")
-    Get-Tree -Path "." -Exclude @("C:\temp\logs", "build")
-    Get-Tree -Files -Exclude @(".git", "dist")
-    Get-Tree -SelectContents -Exclude @("vendor", "cache")
-    Get-Tree -Path "C:\Proyecto" -Exclude @("bin", "obj", ".git") -Files -SelectContents
-    Get-Tree -Exclude @("node_modules", "vendor", "bin", "obj", ".git", "dist", "build")
 
-    # Excluir carpetas comunes automáticamente
-    Get-Tree -ExcludeWellKnown laravel
-    Get-Tree -ExcludeWellKnown react,nodejs -Exclude @("coverage")
+    # Árbol básico del directorio actual
+    Get-Tree
+
+    # Árbol con exclusiones "laravel" y archivos
+    Get-Tree -ExcludeWellKnown "laravel" -Files
 
 NOTAS:
     - Las exclusiones pueden ser rutas relativas o absolutas
@@ -99,6 +79,7 @@ NOTAS:
 # --- Inicialización de variables ---
 try {
     $BasePath = Resolve-Path -Path $Path -ErrorAction Stop
+    $FolderName = Split-Path -Leaf $BasePath.Path
 }
 catch {
     Write-Error "❌ No se pudo resolver la ruta '$Path'. Verifica que existe."
@@ -109,28 +90,23 @@ catch {
 function Get-ExcludedStatus {
     param($ItemFullPath)
 
-    $itemName = [IO.Path]::GetFileName($ItemFullPath)
-    $normalizedPath = [IO.Path]::GetFullPath($ItemFullPath).ToUpperInvariant()
+    # No excluir archivos cuando -Files está activado
+    if ($Files.IsPresent -and -not (Test-Path -Path $ItemFullPath -PathType Container)) {
+        return $false
+    }
+
+    $itemName = Split-Path -Leaf $ItemFullPath
 
     foreach ($ex in $Exclude) {
-        # $exNormalized = $ex.ToUpperInvariant()
-
-        if ($ex.Contains("*") -or $ex.Contains("?")) {
-            if ($itemName -like $ex -or $normalizedPath -like $ex) {
+        # Si es un patrón wildcard
+        if ($ex -match '[\*\?]') {
+            if ($itemName -like $ex) {
                 return $true
             }
         }
-        elseif (-not [IO.Path]::IsPathRooted($ex)) {
-            if ($itemName -eq $ex) {
-                return $true
-            }
-        }
-        else {
-            $normalizedEx = [IO.Path]::GetFullPath($ex).ToUpperInvariant()
-            if ($normalizedPath -eq $normalizedEx -or 
-                $normalizedPath.StartsWith($normalizedEx + [IO.Path]::DirectorySeparatorChar)) {
-                return $true
-            }
+        # Comparación exacta
+        elseif ($itemName -eq $ex) {
+            return $true
         }
     }
     return $false
@@ -140,7 +116,8 @@ function Get-ExcludedStatus {
 function Show-Tree {
     param(
         [string]$CurrentPath,
-        [string]$Prefix = ""
+        [string]$Prefix = "",
+        [bool]$IsRoot = $false
     )
 
     if (-not $CurrentPath -or (Get-ExcludedStatus $CurrentPath)) {
@@ -148,32 +125,41 @@ function Show-Tree {
     }
 
     try {
-        $items = Get-ChildItem -LiteralPath $CurrentPath -Force -ErrorAction Stop
+        $items = @(Get-ChildItem -LiteralPath $CurrentPath -Force -ErrorAction Stop | 
+            Sort-Object { -not $_.PSIsContainer }, Name)
     }
     catch {
         Write-Warning "⚠️ No se pudo acceder a '$CurrentPath': $_"
         return
     }
 
-    $items = $items | Where-Object { -not (Get-ExcludedStatus $_.FullName) }
+    $filteredItems = $items | Where-Object { -not (Get-ExcludedStatus $_.FullName) }
+    $allItems = @($filteredItems)
+    $count = $allItems.Count
 
-    $dirs = $items | Where-Object { $_.PSIsContainer }
-    $files = $items | Where-Object { -not $_.PSIsContainer }
-
-    $entries = @()
-    $entries += $dirs
-    if ($Files.IsPresent) {
-        $entries += $files
+    # Mostrar nombre de la carpeta raíz
+    if ($IsRoot) {
+        Write-Output "$($FolderName)/"
+        # $newPrefix = "│   "
+    }
+    else {
+        $newPrefix = $Prefix
     }
 
-    $count = $entries.Count
-    $i = 0
-
-    foreach ($item in $entries) {
-        $i++
-        $isLast = $i -eq $count
-        $connector = $isLast ? "└── " : "├── "
-        Write-Output "$Prefix$connector$($item.Name)"
+    for ($i = 0; $i -lt $count; $i++) {
+        $item = $allItems[$i]
+        $isLast = $i -eq ($count - 1)
+        
+        $connector = if ($IsRoot) {
+            if ($isLast) { "└── " } else { "├── " }
+        }
+        else {
+            if ($isLast) { "└── " } else { "├── " }
+        }
+        
+        $displayName = if ($item.PSIsContainer) { "$($item.Name)/" } else { $item.Name }
+        
+        Write-Output "$Prefix$connector$displayName"
 
         if ($item.PSIsContainer) {
             $nextPrefix = $Prefix + ($isLast ? "    " : "│   ")
@@ -184,7 +170,7 @@ function Show-Tree {
 
 # --- Ejecución principal ---
 Write-Host "`n📁 Estructura de '$($BasePath.Path)'`n"
-Show-Tree -CurrentPath $BasePath.Path
+Show-Tree -CurrentPath $BasePath.Path -IsRoot $true
 
 # Mostrar contenidos seleccionados si se solicita
 if ($SelectContents.IsPresent) {
