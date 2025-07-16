@@ -234,15 +234,15 @@ function Expand-Zip {
         $entries = $zipPackage.Entries
         if ($ZipFileName) {
             $entries = $entries |
-            ? { $_.FullName.Replace('\', '/') -eq "${prefix}${ZipFileName}" } |
-            select -First 1
+            Where-Object { $_.FullName.Replace('\', '/') -eq "${prefix}${ZipFileName}" } |
+            Select-Object -First 1
         }
         else {
             #Filter out directories
-            $entries = $zipPackage.Entries | ? Name
+            $entries = $zipPackage.Entries | Where-Object Name
             if ($ZipDirectory) {
                 #Filter out items not under requested directory
-                $entries = $entries | ? { $_.FullName.Replace('\', '/').StartsWith($prefix, "OrdinalIgnoreCase") }
+                $entries = $entries | Where-Object { $_.FullName.Replace('\', '/').StartsWith($prefix, "OrdinalIgnoreCase") }
             }
         }
 
