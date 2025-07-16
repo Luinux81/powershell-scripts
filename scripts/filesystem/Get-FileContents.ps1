@@ -26,34 +26,36 @@ function Show-FileContents {
     param(
         [string[]]$FilePaths
     )
-    
+
     $currentDir = (Get-Location).Path
     $output = @()
 
     foreach ($path in $FilePaths) {
         try {
-            # Normalizar rutas
-            $normalizedPath = $path -replace '^\.\\', '' -replace '^\./', ''
-            $resolvedPath = Join-Path -Path $currentDir -ChildPath $normalizedPath
+            # Resolve-Path maneja rutas absolutas, relativas y wildcards y devuelve rutas reales
+            $resolvedPaths = Resolve-Path -Path $path -ErrorAction Stop
 
-            # Manejar wildcards
-            $files = if ($resolvedPath -match '[\*\?]') {
-                Get-ChildItem -Path $resolvedPath -File -ErrorAction Stop
-            }
-            else {
-                Get-Item -Path $resolvedPath -ErrorAction Stop | 
-                Where-Object { -not $_.PSIsContainer }
-            }
+            foreach ($resolvedPathInfo in $resolvedPaths) {
+                $filePath = $resolvedPathInfo.ProviderPath
 
-            foreach ($file in $files) {
-                $relativePath = $file.FullName.Substring($currentDir.Length + 1)
-                $content = Get-Content -Path $file.FullName -Raw -ErrorAction Stop
-                
-                # Mostrar directamente sin crear objeto con FullPath
+                # Asegurar que es archivo, no directorio
+                if (-not (Test-Path -Path $filePath -PathType Leaf)) {
+                    continue
+                }
+
+                # Obtener ruta relativa si está dentro de currentDir, sino ruta absoluta
+                if ($filePath.StartsWith($currentDir)) {
+                    $relativePath = $filePath.Substring($currentDir.Length + 1)
+                }
+                else {
+                    $relativePath = $filePath
+                }
+
+                $content = Get-Content -Path $filePath -Raw -ErrorAction Stop
+
                 Write-Host "`n=== $relativePath ===" -ForegroundColor Cyan
                 Write-Host $content
-                
-                # Agregar a output solo si se necesita para pipeline
+
                 $output += [PSCustomObject]@{
                     RelativePath = $relativePath
                     Content      = $content
@@ -65,9 +67,7 @@ function Show-FileContents {
         }
     }
 
-    # Devolver solo lo necesario (sin FullPath)
     return $output
 }
 
-# Ejecutar y suprimir salida automática de objetos
 $null = Show-FileContents -FilePaths $Paths
